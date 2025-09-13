@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>モンストマルチ掲示板(仮)</title>
+  <title>モンストマルチ掲示板</title>
   <style>
     body { font-family:sans-serif; margin:0; padding:20px; background:#f9f9f9; }
     h1{text-align:center;}
@@ -42,8 +42,8 @@
         <option value="天魔の孤城-空中庭園">天魔の孤城-空中庭園</option>
         <option value="破界の星墓">破界の星墓</option>
       </select>
-      <textarea id="content" placeholder="募集内容" maxlength="300" required></textarea>
-      <textarea id="url" placeholder="モンストマルチURL" required></textarea>
+      <textarea id="content" placeholder="募集内容（300文字まで）" maxlength="300"></textarea>
+      <textarea id="url" placeholder="モンスト公式マルチURLとステージ名を貼り付け" required></textarea>
       <button type="submit">投稿</button>
     </form>
   </div>
@@ -105,7 +105,7 @@
 
       if(!genre){ alert("ジャンルを選択してください"); return; }
       if(content.length>300){ alert("募集内容は300文字以内です"); return; }
-      if((content.match(/\n/g)||[]).length>10){ alert("エラーが発生しました。投稿内容をもう一度確認してください。"); return; }
+      if((content.match(/\n/g)||[]).length>10){ alert("エラーが発生しました。投稿内容をもう一度確認してください"); return; }
 
       // ステージ名とURL抽出
       let urlMatch = urlInput.match(/https:\/\/static\.monster-strike\.com\/line\/\?target=stage&pass_code=\S+/);
@@ -167,4 +167,3 @@
   </script>
 </body>
 </html>
-
