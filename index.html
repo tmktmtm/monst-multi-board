@@ -5,20 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>モンストマルチ掲示板</title>
   <style>
-    body { font-family: sans-serif; margin:0; padding:20px; background:#f9f9f9; }
-    h1 { text-align:center; }
-    h2 { margin-top:20px; }
-    .post { background:#fff; padding:15px; margin:10px 0; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.1); word-break: break-word; }
-    a { font-weight:bold; color:#0066cc; text-decoration:none; }
-    input, textarea, select, button { width:100%; margin:5px 0; padding:10px; box-sizing:border-box; }
-    button { cursor:pointer; }
-    h3 { margin-top:20px; border-bottom:1px solid #ccc; padding-bottom:5px; }
+    body { font-family:sans-serif; margin:0; padding:20px; background:#f9f9f9; }
+    h1{text-align:center;}
+    h2{margin-top:20px;}
+    .post{background:#fff; padding:15px; margin:10px 0; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.1); word-break: break-word;}
+    .post a{text-decoration:none;}
+    .stageName{color:blue; font-weight:bold;}
+    .contentText{color:black; margin-top:5px;}
+    input, textarea, select, button{width:100%; margin:5px 0; padding:10px; box-sizing:border-box;}
+    button{cursor:pointer;}
+    h3{margin-top:20px; border-bottom:1px solid #ccc; padding-bottom:5px;}
     @media (max-width:600px){
       body{padding:10px;}
       .post{padding:10px; font-size:14px;}
       input,textarea,select,button{padding:8px; font-size:14px;}
     }
-    #postFormContainer { display:none; margin-top:20px; }
+    #postFormContainer{display:none; margin-top:20px;}
   </style>
 
   <!-- Firebase SDK -->
@@ -41,14 +43,13 @@
         <option value="破界の星墓">破界の星墓</option>
       </select>
       <textarea id="content" placeholder="募集内容（300文字まで）" maxlength="300" required></textarea>
-      <input type="url" id="url" placeholder="マルチURL（https://static.monsterstrike.com/...）" required>
+      <textarea id="url" placeholder="モンスト公式マルチURLとステージ名を貼り付け" required></textarea>
       <button type="submit">投稿</button>
     </form>
   </div>
 
   <h2>最新の募集</h2>
 
-  <!-- ジャンル選択 -->
   <select id="filterGenre">
     <option value="all">すべて</option>
     <option value="降臨">降臨</option>
@@ -63,12 +64,9 @@
     // 投稿フォーム表示切替
     const showFormBtn = document.getElementById("showFormBtn");
     const postFormContainer = document.getElementById("postFormContainer");
-    showFormBtn.addEventListener("click", () => {
-      postFormContainer.style.display = "block";
-      showFormBtn.style.display = "none";
-    });
+    showFormBtn.addEventListener("click",()=>{ postFormContainer.style.display="block"; showFormBtn.style.display="none"; });
 
-    // Firebase設定（ここに自分のFirebase設定を入力）
+    // Firebase設定
     var firebaseConfig = {
       apiKey: "AIzaSyCPJUm10xZ1d7l5iAiophGuNWx1TTYX4zU",
       authDomain: "monst-multi-19970.firebaseapp.com",
@@ -81,23 +79,19 @@
     firebase.initializeApp(firebaseConfig);
     var db = firebase.database();
 
-    async function getIP() {
+    async function getIP(){
       let res = await fetch("https://api.ipify.org?format=json");
       let data = await res.json();
       return data.ip;
     }
 
-    function formatTimeAgo(timestamp) {
-      var now = Date.now();
-      var diff = now - timestamp;
-      var sec = Math.floor(diff / 1000);
-      var min = Math.floor(sec / 60);
-      var hour = Math.floor(min / 60);
-      var day = Math.floor(hour / 24);
-      if(sec < 60) return sec + "秒前";
-      if(min < 60) return min + "分前";
-      if(hour < 24) return hour + "時間前";
-      return day + "日前";
+    function formatTimeAgo(timestamp){
+      var now=Date.now(), diff=now-timestamp;
+      var sec=Math.floor(diff/1000), min=Math.floor(sec/60), hour=Math.floor(min/60), day=Math.floor(hour/24);
+      if(sec<60) return sec+"秒前";
+      if(min<60) return min+"分前";
+      if(hour<24) return hour+"時間前";
+      return day+"日前";
     }
 
     // 投稿処理
@@ -105,87 +99,71 @@
       e.preventDefault();
       var genre = document.getElementById("genre").value.trim();
       var content = document.getElementById("content").value.trim();
-      var url = document.getElementById("url").value.trim();
+      var urlInput = document.getElementById("url").value.trim();
       var ip = await getIP();
       var now = Date.now();
 
-      if (!genre) { alert("ジャンルを選択してください。"); return; }
-      if (content.length > 300) { alert("募集内容は300文字以内で入力してください。"); return; }
-      var newlineCount = (content.match(/\n/g) || []).length;
-      if (newlineCount > 10) { alert("エラーが発生しました。投稿内容をもう一度確認してください。"); return; }
-      if (!url.startsWith("https://static.monsterstrike.com/")) { alert("モンスト公式のマルチURLのみ投稿できます。"); return; }
+      if(!genre){ alert("ジャンルを選択してください"); return; }
+      if(content.length>300){ alert("募集内容は300文字以内です"); return; }
+      if((content.match(/\n/g)||[]).length>10){ alert("エラーが発生しました。投稿内容をもう一度確認してください。"); return; }
+
+      // ステージ名とURL抽出
+      let urlMatch = urlInput.match(/https:\/\/static\.monster-strike\.com\/line\/\?target=stage&pass_code=\S+/);
+      let stageMatch = urlInput.match(/「(.+?)」/);
+      if(!urlMatch||!stageMatch){ alert("正しいモンストマルチURLとステージ名を貼り付けてください"); return; }
+
+      let stageName = stageMatch[1];
+      let url = urlMatch[0];
 
       db.ref("posts").orderByChild("ip").equalTo(ip).limitToLast(1).once("value", function(snapshot){
-        let allow = true;
-        snapshot.forEach(function(child){
-          if(now - child.val().time < 30000) { allow = false; }
-        });
+        let allow=true;
+        snapshot.forEach(function(child){ if(now-child.val().time<30000) allow=false; });
         if(allow){
-          var safeContent = content.replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>");
-          db.ref("posts").push({
-            genre: genre,
-            content: safeContent,
-            url: url,
-            time: now,
-            ip: ip
-          });
+          var safeContent=content.replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>");
+          db.ref("posts").push({genre:genre, stageName:stageName, content:safeContent, url:url, time:now, ip:ip});
           document.getElementById("postForm").reset();
-        } else {
-          alert("⚠️ 30秒空けてからもう一度投稿してください。");
-        }
+        } else { alert("⚠️ 30秒空けてからもう一度投稿してください"); }
       });
     });
 
-    const filterGenre = document.getElementById("filterGenre");
+    const filterGenre=document.getElementById("filterGenre");
 
-    // 投稿一覧描画
     function renderPosts(snapshot){
-      const postsDiv = document.getElementById("posts");
-      postsDiv.innerHTML = "";
-      const now = Date.now();
-      const genres = {"降臨": [], "天魔の孤城-試練": [], "天魔の孤城-空中庭園": [], "破界の星墓": []};
+      const postsDiv=document.getElementById("posts");
+      postsDiv.innerHTML="";
+      const now=Date.now();
+      const genres={"降臨":[], "天魔の孤城-試練":[], "天魔の孤城-空中庭園":[], "破界の星墓":[]};
 
-      snapshot.forEach(child => {
-        const post = child.val();
-        const postKey = child.key;
-
-        if(now - post.time > 30*60*1000){
-          db.ref("posts/"+postKey).remove();
-          return;
-        }
-
-        if(genres[post.genre]) genres[post.genre].push({key: postKey, data: post});
+      snapshot.forEach(child=>{
+        const post=child.val();
+        const key=child.key;
+        if(now-post.time>30*60*1000){ db.ref("posts/"+key).remove(); return; }
+        if(genres[post.genre]) genres[post.genre].push({key:key,data:post});
       });
 
-      const selectedGenre = filterGenre.value;
+      const selectedGenre=filterGenre.value;
 
       for(const g in genres){
-        if(selectedGenre !== "all" && g !== selectedGenre) continue;
-
-        const divGenre = document.createElement("div");
-        divGenre.innerHTML = `<h3>${g}</h3>`;
-        genres[g].sort((a,b) => b.data.time - a.data.time).slice(0,30).forEach(item => {
-          const post = item.data;
-          const div = document.createElement("div");
-          div.className = "post";
-          div.innerHTML =
-            "<p>"+post.content+"</p>" +
-            "<a href='"+post.url+"' target='_blank'>参加する</a><br>" +
-            "<small>投稿: "+formatTimeAgo(post.time)+"</small>";
+        if(selectedGenre!=="all" && g!==selectedGenre) continue;
+        const divGenre=document.createElement("div");
+        divGenre.innerHTML=`<h3>${g}</h3>`;
+        genres[g].sort((a,b)=>b.data.time-a.data.time).slice(0,30).forEach(item=>{
+          const post=item.data;
+          const div=document.createElement("div");
+          div.className="post";
+          div.innerHTML=
+            `<a href="${post.url}" target="_blank">
+               <div class="stageName">${post.stageName}</div>
+               <div class="contentText">${post.content}</div>
+             </a>`;
           divGenre.appendChild(div);
         });
-
         postsDiv.appendChild(divGenre);
       }
     }
 
-    // ジャンル選択時に再描画
-    filterGenre.addEventListener("change", () => {
-      db.ref("posts").orderByChild("time").limitToLast(200).once("value", renderPosts);
-    });
-
-    // リアルタイム監視
-    db.ref("posts").orderByChild("time").limitToLast(200).on("value", renderPosts);
+    filterGenre.addEventListener("change",()=>{ db.ref("posts").orderByChild("time").limitToLast(200).once("value",renderPosts); });
+    db.ref("posts").orderByChild("time").limitToLast(200).on("value",renderPosts);
   </script>
 </body>
 </html>
