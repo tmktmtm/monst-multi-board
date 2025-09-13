@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>モンストマルチ掲示板</title>
+  <style>
+    body { font-family: sans-serif; background: #f9f9f9; padding: 20px; }
+    h1 { text-align: center; }
+    .post { background: #fff; padding: 15px; margin: 10px 0; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    a { font-weight: bold; color: #0066cc; text-decoration: none; }
+    input, textarea, select { width: 100%; margin: 5px 0; padding: 8px; }
+    button { padding: 8px 15px; margin-top: 5px; }
+    h3 { margin-top: 20px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+  </style>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+</head>
+<body>
+  <h1>モンストマルチ掲示板</h1>
+
+  <h2>募集を投稿する</h2>
+  <form id="postForm">
+    <select id="genre" required>
+      <option value="">ジャンルを選択</option>
+      <option value="降臨">降臨</option>
+      <option value="天魔の孤城-試練">天魔の孤城-試練</option>
+      <option value="天魔の孤城-空中庭園">天魔の孤城-空中庭園</option>
+      <option value="破界の星墓">破界の星墓</option>
+    </select>
+    <textarea id="content" placeholder="募集内容（300文字まで）" maxlength="300" required></textarea>
+    <input type="url" id="url" placeholder="マルチURL（https://static.monsterstrike.com/...）" required>
+    <button type="submit">投稿</button>
+  </form>
+
+  <h2>最新の募集</h2>
+  <div id="posts"></div>
+
+  <script>
+    // Firebase設定
+    var firebaseConfig = {
+      apiKey: "AIzaSyCPJUm10xZ1d7l5iAiophGuNWx1TTYX4zU",
+      authDomain: "monst-multi-19970.firebaseapp.com",
+      databaseURL: "https://monst-multi-19970-default-rtdb.firebaseio.com",
+      projectId: "monst-multi-19970",
+      storageBucket: "monst-multi-19970.firebasestorage.app",
+      messagingSenderId: "929869958243",
+      appId: "1:929869958243:web:71af0807ae62fa75a5bc56"
+    };
+    firebase.initializeApp(firebaseConfig);
+    var db = firebase.database();
+
+    // ユーザーIPを取得
+    async function getIP() {
+      let res = await fetch("https://api.ipify.org?format=json");
+      let data = await res.json();
+      return data.ip;
+    }
+
+    // SNS風時刻表示
+    function formatTimeAgo(timestamp) {
+      var now = Date.now();
+      var diff = now - timestamp;
+
+      var sec = Math.floor(diff / 1000);
+      var min = Math.floor(sec / 60);
+      var hour = Math.floor(min / 60);
+      var day = Math.floor(hour / 24);
+
+      if (sec < 60) return sec + "秒前";
+      if (min < 60) return min + "分前";
+      if (hour < 24) return hour + "時間前";
+      return day + "日前";
+    }
+
+    // 投稿処理
+    document.getElementById("postForm").addEventListener("submit", async function(e){
+      e.preventDefault();
+      var genre = document.getElementById("genre").value.trim();
+      var content = document.getElementById("content").value.trim();
+      var url = document.getElementById("url").value.trim();
+      var ip = await getIP();
+      var now = Date.now();
+
+      // ジャンル選択チェック
+      if (!genre) {
+        alert("ジャンルを選択してください。");
+        return;
+      }
+
+      // 文字数チェック
+      if (content.length > 300) {
+        alert("募集内容は300文字以内で入力してください。");
+        return;
+      }
+
+      // 改行数チェック（最大10回）
+      var newlineCount = (content.match(/\n/g) || []).length;
+      if (newlineCount > 10) {
+        alert("エラーが発生しました。投稿内容をもう一度確認してください。");
+        return;
+      }
+
+      // URLチェック
+      if (!url.startsWith("https://static.monsterstrike.com/")) {
+        alert("モンスト公式のマルチURLのみ投稿できます。");
+        return;
+      }
+
+      // 直近投稿チェック（30秒クールタイム）
+      db.ref("posts").orderByChild("ip").equalTo(ip).limitToLast(1).once("value", function(snapshot){
+        let allow = true;
+        snapshot.forEach(function(child){
+          let post = child.val();
+          if (now - post.time < 30000) {
+            allow = false;
+          }
+        });
+
+        if (allow) {
+          // 改行のみ反映、HTMLタグを無害化
+          var safeContent = content.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
+
+          db.ref("posts").push({
+            genre: genre,
+            content: safeContent,
+            url: url,
+            time: now,
+            ip: ip
+          });
+          document.getElementById("postForm").reset();
+        } else {
+          alert("⚠️ 30秒空けてからもう一度投稿してください。");
+        }
+      });
+    });
+
+    // 投稿一覧描画
+    function renderPosts(snapshot) {
+      var postsDiv = document.getElementById("posts");
+      postsDiv.innerHTML = "";
+      var now = Date.now();
+
+      var genres = {
+        "降臨": [],
+        "天魔の孤城-試練": [],
+        "天魔の孤城-空中庭園": [],
+        "破界の星墓": []
+      };
+
+      snapshot.forEach(function(child){
+        var post = child.val();
+        var postKey = child.key;
+
+        // 30分以上経過した投稿は削除
+        if (now - post.time > 30 * 60 * 1000) {
+          db.ref("posts/" + postKey).remove();
+          return;
+        }
+
+        if (genres[post.genre]) {
+          genres[post.genre].push({key: postKey, data: post});
+        }
+      });
+
+      // ジャンルごとに最新30件表示
+      for (var g in genres) {
+        var divGenre = document.createElement("div");
+        divGenre.innerHTML = `<h3>${g}</h3>`;
+
+        genres[g].sort((a, b) => b.data.time - a.data.time); // 新しい順
+        genres[g].slice(0, 30).forEach(function(item){
+          var post = item.data;
+          var div = document.createElement("div");
+          div.className = "post";
+          div.innerHTML =
+            "<p>" + post.content + "</p>" +
+            "<a href='" + post.url + "' target='_blank'>参加する</a><br>" +
+            "<small>投稿: " + formatTimeAgo(post.time) + "</small>";
+          divGenre.appendChild(div);
+        });
+
+        postsDiv.appendChild(divGenre);
+      }
+    }
+
+    // リアルタイム更新
+    db.ref("posts").orderByChild("time").limitToLast(200).on("value", renderPosts);
+  </script>
+</body>
+</html>
